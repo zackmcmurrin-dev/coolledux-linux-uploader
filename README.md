@@ -2,7 +2,7 @@
 
 Native Linux uploader for CoolLEDUX BLE LED panels.
 
-This project allows Linux users to upload animated GIF files directly to a CoolLEDUX display without requiring Android emulators or the official mobile application.
+This project allows Linux users to upload animated GIF files directly to a CoolLEDUX display without requiring Android emulators, Windows software, or the official mobile application.
 
 ---
 
@@ -103,6 +103,22 @@ To force an upload:
 coolledux-upload myanimation.gif --auto --force
 ```
 
+### Known Limitation
+
+`--force` works by modifying the first frame timing so the panel treats the upload as a new animation.
+
+For some seamless looping GIFs (such as Matrix rain effects), this may introduce a visible stutter at the loop point.
+
+If smooth playback is important, upload normally:
+
+```bash
+coolledux-upload myanimation.gif --auto
+```
+
+or make a small edit to the GIF before uploading.
+
+Static images are generally unaffected.
+
 ---
 
 ## Playback Speed
@@ -182,6 +198,33 @@ done, watch panel
 
 ---
 
+## Notes and Known Behavior
+
+### Frame Limits
+
+Testing has shown:
+
+* 40 frames is the safest and most compatible limit.
+* The official CoolLED1248 app appears to use a 40-frame limit.
+* The panel hardware can accept more than 40 frames.
+* Uploads up to approximately 55 frames have been successfully tested.
+* Uploads of 56 frames and higher may be rejected by the panel.
+
+For maximum compatibility with both the Linux uploader and the official mobile application, 40 frames is recommended.
+
+### Panel Discovery
+
+The panel may occasionally stop advertising while connected to another device.
+
+If auto-discovery fails:
+
+* Close the mobile app.
+* Disconnect any existing BLE connections.
+* Try again using `--auto`.
+* Or specify the address manually using `--address`.
+
+---
+
 ## Current Status
 
 Working:
@@ -197,10 +240,11 @@ Working:
 
 Planned:
 
-* GitHub releases
-* Package builds
+* Additional protocol research
+* JT file investigation
 * Additional panel support
 * GUI frontend
+* Packaging for major Linux distributions
 
 ---
 
@@ -214,35 +258,10 @@ See LICENSE file for details.
 
 ## Credits
 
-Development Notes
+CoolLEDUX protocol reverse engineering performed on Linux using:
 
-This project was developed through a combination of manual reverse engineering, testing on real CoolLEDUX hardware, and AI-assisted coding/documentation.
+* Python
+* Bleak
+* Pillow
 
-The CoolLEDUX protocol was reverse engineered by analyzing the Android application, capturing BLE traffic, examining protocol behavior, and validating discoveries on actual hardware.
-
-All protocol discoveries, packet validation, testing, and Linux compatibility verification were performed on real CoolLEDUX panels.
-
-This project was created to make these inexpensive LED matrix displays easier to use from Linux without requiring Android devices, Windows software, or emulation.
-
-License
-
-Open source.
-
-See LICENSE file for details.
-
-Credits
-Protocol Reverse Engineering, Testing, and Project Direction
-
-Zachary McMurrin
-
-AI-Assisted Development
-
-OpenAI ChatGPT
-
-Used for code generation assistance, debugging assistance, documentation writing, installer creation, and general development support.
-
-Acknowledgements
-
-## Acknowledgements
-
-Thanks to the open-source community and everyone who shares technical knowledge, documentation, and tools.
+Thanks to the maker community for testing, feedback, and experimentation with these inexpensive BLE LED panels.
