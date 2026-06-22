@@ -2,7 +2,7 @@
 
 Native Linux uploader for CoolLEDUX BLE LED panels.
 
-This project allows Linux users to upload animated GIF files directly to a CoolLEDUX display without requiring Android emulators, Windows, or the official mobile application.
+This project allows Linux users to upload animated GIF files directly to a CoolLEDUX display without requiring Android emulators or the official mobile application.
 
 ---
 
