@@ -8,7 +8,7 @@ from bleak import BleakClient, BleakScanner
 from PIL import Image, ImageSequence
 
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 DEFAULT_ADDR = "01:00:00:54:EC:17"
 CHAR = "0000fff1-0000-1000-8000-00805f9b34fb"
 
@@ -20,18 +20,24 @@ NIL = N
 ack_queue = asyncio.Queue()
 
 
-def u16(n): return int(n).to_bytes(2, "big")
-def u32(n): return int(n).to_bytes(4, "big", signed=False)
+def u16(n):
+    return int(n).to_bytes(2, "big")
+
+
+def u32(n):
+    return int(n).to_bytes(4, "big", signed=False)
 
 
 def wrap(payload: bytes) -> bytes:
     data = u16(len(payload)) + payload
     out = bytearray([0x01])
+
     for b in data:
         if 0x00 < b < 0x04:
             out += bytes([0x02, b ^ 0x04])
         else:
             out.append(b)
+
     out.append(0x03)
     return bytes(out)
 
@@ -42,6 +48,7 @@ def unwrap(packet: bytes) -> bytes:
 
     out = bytearray()
     i = 0
+
     while i < len(packet):
         if packet[i] == 0x02 and i + 1 < len(packet):
             out.append(packet[i + 1] ^ 0x04)
@@ -62,10 +69,12 @@ def crc32_coolledux(data: bytes) -> int:
             crc_high = crc & 0x80000000
             data_high = b & 0x80
             crc = (crc << 1) & 0xFFFFFFFF
+
             if crc_high:
                 crc ^= poly
             if data_high:
                 crc ^= poly
+
             b = (b << 1) & 0xFF
 
     return crc & 0xFFFFFFFF
@@ -89,6 +98,7 @@ def lzss_compress(src: bytes) -> bytes:
 
     def insert_node(r):
         nonlocal match_position, match_length
+
         p = text_buf[r] + N + 1
         lson[r] = NIL
         rson[r] = NIL
@@ -112,6 +122,7 @@ def lzss_compress(src: bytes) -> bytes:
                     return
 
             i = 1
+
             while i < F:
                 cmp_val = text_buf[r + i] - text_buf[p + i]
                 if cmp_val != 0:
@@ -147,13 +158,16 @@ def lzss_compress(src: bytes) -> bytes:
             q = rson[p]
         else:
             q = lson[p]
+
             if rson[q] != NIL:
                 while rson[q] != NIL:
                     q = rson[q]
+
                 rson[dad[q]] = lson[q]
                 dad[lson[q]] = dad[q]
                 lson[q] = lson[p]
                 dad[lson[p]] = q
+
             rson[q] = rson[p]
             dad[rson[p]] = q
 
@@ -171,6 +185,7 @@ def lzss_compress(src: bytes) -> bytes:
 
     for i in range(N + 1, N + 257):
         rson[i] = NIL
+
     for i in range(N):
         dad[i] = NIL
 
@@ -227,21 +242,26 @@ def lzss_compress(src: bytes) -> bytes:
             src_pos += 1
 
             text_buf[s] = c
+
             if s < F - 1:
                 text_buf[s + N] = c
 
             s = (s + 1) & (N - 1)
             r = (r + 1) & (N - 1)
+
             insert_node(r)
             i += 1
 
         while i < last_match_length:
             delete_node(s)
+
             s = (s + 1) & (N - 1)
             r = (r + 1) & (N - 1)
             length -= 1
+
             if length > 0:
                 insert_node(r)
+
             i += 1
 
         if length <= 0:
@@ -275,8 +295,10 @@ def frame_to_native_bytes(img, width, height):
     for x in range(width):
         for y in range(height):
             r, g, b, a = img.getpixel((x, y))
+
             if a < 128:
                 r = g = b = 0
+
             data += rgb444(r, g, b)
 
     return bytes(data)
@@ -295,6 +317,7 @@ def load_gif_frames(path, width, height, max_frames, speed=1.0, force=False):
             break
 
         duration = frame.info.get("duration", 100)
+
         if duration <= 0:
             duration = 100
 
@@ -373,8 +396,10 @@ def chunks(data, size=1024):
 
 def notification_handler(sender, data):
     payload = unwrap(data)
+
     if not getattr(notification_handler, "quiet", False):
         print("notify:", payload.hex(" "))
+
     ack_queue.put_nowait(payload)
 
 
@@ -395,22 +420,28 @@ async def find_coolledux(timeout=8):
     devices = await BleakScanner.discover(timeout=timeout)
 
     matches = []
+
     for d in devices:
         name = d.name or ""
+
         if name.lower() == "coolledux":
             matches.append(d)
 
     if not matches:
         print("no CoolLEDUX devices found")
         print("nearby BLE devices:")
+
         for d in devices:
             print(f"  {d.address}  {d.name or '(no name)'}")
+
         raise RuntimeError("No CoolLEDUX panel found. Try --address XX:XX:XX:XX:XX:XX")
 
     if len(matches) > 1:
         print("multiple CoolLEDUX panels found:")
+
         for d in matches:
             print(f"  {d.address}  {d.name}")
+
         print("using first match")
 
     panel = matches[0]
@@ -435,6 +466,7 @@ async def wait_for_ack(kind, chunk_index=None, timeout=5.0):
             if idx == chunk_index:
                 if status != 0:
                     raise RuntimeError(f"chunk {chunk_index} error {status}")
+
                 return payload
 
 
@@ -496,6 +528,17 @@ async def upload(args):
         if len(start_ack) >= 2 and start_ack[1] == 1:
             print("device says program already exists; skipping chunk upload")
             print("Use --force to change timing and force a re-upload.")
+            return
+
+        if len(start_ack) >= 2 and start_ack[1] == 3:
+            print("ERROR: panel rejected program.")
+            print("Try fewer frames, smaller dimensions, or lower --max-frames.")
+            print("Known safe default is --max-frames 40.")
+            print("Testing showed 50 frames may work, but 55+ may be unreliable.")
+            return
+
+        if len(start_ack) >= 2 and start_ack[1] != 0:
+            print(f"ERROR: panel rejected start packet with status {start_ack[1]:02x}.")
             return
 
         for idx, chunk in enumerate(chunk_list):
