@@ -1,0 +1,18 @@
+# Python virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Temporary clock-render files
+.render-clock-temp.png
+.render-clock-temp.gif
+
+# Editor / OS junk
+*~
+.DS_Store
+
+# Local development / known-good backups
+coolledux-upload.py.v*

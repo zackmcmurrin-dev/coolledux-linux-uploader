@@ -1,0 +1,11 @@
+{
+  "name": "pipboy",
+  "custom_font": "pipboy",
+  "color": "#00ff66",
+  "style": 2,
+  "hour_x": 17,
+  "colon_x": 31,
+  "minute_x": 33,
+  "clock_y": 0,
+  "colon_w": null
+}

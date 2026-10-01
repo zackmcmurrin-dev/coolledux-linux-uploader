@@ -1,0 +1,20 @@
+# CoolLEDUX Clock Face Colon
+# 2 pixels wide x 16 pixels high.
+# Use # for lit pixels and . for blank pixels.
+
+..
+..
+..
+##
+##
+..
+..
+..
+..
+..
+..
+##
+##
+..
+..
+..
