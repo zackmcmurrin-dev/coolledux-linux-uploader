@@ -683,31 +683,80 @@ def build_native_clock_program(style=1, color_rgb=(255, 255, 255), is_24h=False,
     return bytes(program)
 
 
-def build_native_program_from_gif(path, width=64, height=16, max_frames=40, speed=1.0, force=False):
-    img = Image.open(path)
+def frame_to_native_bytes(img, width, height):
+    """Convert one image frame to the panel's native pixel format."""
+    img = img.convert("RGBA").resize(
+        (width, height),
+        Image.Resampling.NEAREST,
+    )
+
+    data = bytearray()
+
+    # Known-good v0.1 native pixel ordering.
+    for x in range(width):
+        for y in range(height):
+            r, g, b, a = img.getpixel((x, y))
+
+            if a < 128:
+                r = g = b = 0
+
+            data += rgb444(r, g, b)
+
+    return bytes(data)
+
+
+def load_gif_frames(path, width, height, max_frames, speed=1.0, force=False):
+    """Load GIF frames using the known-good v0.1 conversion behavior."""
+    if speed <= 0:
+        raise ValueError("--speed must be greater than 0")
+
+    src = Image.open(path)
     frames = []
     delays = []
 
-    for frame in ImageSequence.Iterator(img):
-        frame = frame.convert("RGB").resize((width, height), Image.Resampling.NEAREST)
-        raw = bytearray()
-
-        for x in range(width):
-            for y in range(height):
-                r, g, b = frame.getpixel((x, y))
-                raw += rgb444(r, g, b)
-
-        frames.append(bytes(raw))
-
-        delay = frame.info.get("duration", img.info.get("duration", 100))
-        delay = max(10, int(delay / speed))
-        delays.append(delay)
-
+    for frame in ImageSequence.Iterator(src):
         if len(frames) >= max_frames:
             break
 
+        duration = frame.info.get("duration", 100)
+
+        if duration <= 0:
+            duration = 100
+
+        duration = int(duration / speed)
+        duration = max(20, min(65535, duration))
+
+        frames.append(
+            frame_to_native_bytes(frame, width, height)
+        )
+        delays.append(duration)
+
+    if not frames:
+        raise RuntimeError("No frames loaded from GIF")
+
+    # Preserve the v0.1 --force behavior exactly.
     if force and delays:
-        delays[0] = max(10, delays[0] + int(time.time()) % 7 + 1)
+        delays[0] = 20 + (int(time.time() * 1000) % 500)
+
+    return frames, delays
+
+
+def build_native_program_from_gif(
+    path,
+    width=64,
+    height=16,
+    max_frames=40,
+    speed=1.0,
+    force=False,
+):
+    frames, delays = load_gif_frames(
+        path,
+        width,
+        height,
+        max_frames,
+        speed,
+        force,
+    )
 
     inner = bytearray()
     inner += b"\x03\x01"
@@ -757,6 +806,20 @@ def make_chunk_packet(compressed, chunk_index, chunk):
 
 def make_brightness_packet(level):
     return wrap(bytes([0x04, level & 0x0F]))
+
+
+def make_flip_packet(mode):
+    """Build panel orientation packet exactly as captured from official app."""
+
+    packets = {
+        "none": bytes.fromhex("01 00 02 06 0c 00 03"),
+        "x":    bytes.fromhex("01 00 02 06 0c 02 06 03"),
+        "y":    bytes.fromhex("01 00 02 06 0c 02 07 03"),
+        "xy":   bytes.fromhex("01 00 02 06 0c 02 05 03"),
+    }
+
+    return packets[mode]
+
 
 
 def make_sync_time_packet(now=None):
@@ -810,6 +873,8 @@ async def wait_for_ack(kind, timeout=8):
         if kind == "chunk" and len(payload) >= 1 and payload[0] == 0x03:
             return payload
         if kind == "brightness" and len(payload) >= 1 and payload[0] == 0x04:
+            return payload
+        if kind == "flip" and len(payload) >= 2 and payload[0] == 0x0C:
             return payload
         if kind == "sync" and len(payload) >= 1 and payload[0] == 0x09:
             return payload
@@ -876,6 +941,25 @@ async def set_brightness(args):
         await write_ble_packet(client, make_brightness_packet(args.brightness))
         await wait_for_ack("brightness")
         print("done")
+
+
+async def set_flip(args):
+    notification_handler.quiet = args.quiet
+
+    async for client in connect_login(args):
+        print(f"setting panel orientation: {args.flip}")
+
+        packet = make_flip_packet(args.flip)
+        print("flip packet:", unwrap(packet).hex(" "))
+
+        await write_ble_packet(client, packet)
+
+        # The panel echoes the orientation command on FFF1.
+        payload = await wait_for_ack("flip")
+        print("flip ACK:", payload.hex(" "))
+
+        print("done")
+
 
 
 async def upload_program(args, program, label, details=None):
@@ -1135,6 +1219,7 @@ def parse_args():
     p.add_argument("--quiet", action="store_true", help="Hide notify ACK spam")
     p.add_argument("--force", action="store_true", help="Force re-upload by changing first frame delay")
     p.add_argument("--brightness", type=int, choices=range(0, 16), metavar="0-15", help="Set brightness before upload")
+    p.add_argument("--flip", choices=("none", "x", "y", "xy"), help="Set persistent panel orientation")
     p.add_argument("--sync-time", action="store_true", help="Synchronize panel clock from system time")
     p.add_argument("--render-clock", action="store_true", help="Render custom 64x16 clock PNG only; no BLE upload")
     p.add_argument("--upload-render-clock", action="store_true", help="Render custom clock and upload it as a static 64x16 program")
@@ -1232,6 +1317,10 @@ def main():
 
     if args.brightness is not None and not args.gif and not args.clock:
         asyncio.run(set_brightness(args))
+        return
+
+    if args.flip is not None and not args.gif and not args.clock:
+        asyncio.run(set_flip(args))
         return
 
     if args.clock:
