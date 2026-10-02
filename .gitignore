@@ -19,3 +19,6 @@ coolledux-upload.py.v*
 
 # Local Bluetooth reverse-engineering captures
 bluetooth-capture/
+
+# Local documentation backups
+README.md.before-*

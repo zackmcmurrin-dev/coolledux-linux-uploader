@@ -1,8 +1,10 @@
-# CoolLEDUX Linux GIF Uploader
+# CoolLEDUX Linux Uploader
 
-Native Linux uploader for CoolLEDUX BLE LED panels.
+Native Linux uploader and control toolkit for CoolLEDUX BLE LED panels.
 
-This project allows Linux users to upload animated GIF files directly to a CoolLEDUX display without requiring Android emulators, Windows software, or the official mobile application.
+This project allows Linux users to upload animated GIFs, create native live clock programs, synchronize panel time, control brightness, and change persistent panel orientation without requiring Android emulators, Windows software, or the official mobile application.
+
+Development is currently focused on reverse engineering the CoolLEDUX BLE protocol and making useful panel features available directly from Linux.
 
 ---
 
@@ -10,13 +12,22 @@ This project allows Linux users to upload animated GIF files directly to a CoolL
 
 * Native Linux support
 * BLE auto-discovery
-* Upload animated GIFs
-* Adjustable playback speed
-* Brightness control
+* Animated GIF upload
 * Automatic GIF resizing
+* Adjustable GIF playback speed
 * Progress percentage display
 * Force re-upload option
-* Simple installer
+* Native live clock programs
+* 12-hour and 24-hour clock modes
+* Custom native clock fonts
+* Custom clock colon bitmaps
+* External clock-face folders
+* Custom clock colors and geometry
+* Panel RTC time synchronization
+* Brightness control
+* Persistent panel orientation control (`none`, `x`, `y`, `xy`)
+* Simple command-line installer
+* Protocol experiment tools for development
 
 ---
 
@@ -31,31 +42,40 @@ This project allows Linux users to upload animated GIF files directly to a CoolL
 
 ## Installation
 
-Clone or download the project:
+Clone the repository:
 
 ```bash
-git clone https://github.com/YOURNAME/coolledux-linux-uploader.git
+git clone https://github.com/zackmcmurrin-dev/coolledux-linux-uploader.git
 cd coolledux-linux-uploader
 ```
 
 Run the installer:
 
 ```bash
-chmod +x install.sh
 ./install.sh
 ```
 
-If the command is not found after installation:
+The installer creates a Python virtual environment, installs the required
+dependencies, and creates the `coolledux-upload` command in `~/.local/bin`.
+
+If `coolledux-upload` is not found after installation:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Permanent fix:
+To add that directory to your Bash PATH permanently:
 
 ```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+```
+
+Verify the installation:
+
+```bash
+coolledux-upload --version
+coolledux-upload --help
 ```
 
 ---
@@ -90,6 +110,111 @@ Upload quietly:
 ```bash
 coolledux-upload myanimation.gif --auto --quiet
 ```
+
+You can also specify the panel BLE address directly:
+
+```bash
+coolledux-upload myanimation.gif --address 01:00:00:54:EC:17
+```
+
+### Brightness
+
+Brightness can be set from 0 to 15 without uploading a GIF:
+
+```bash
+coolledux-upload --address 01:00:00:54:EC:17 --brightness 8
+```
+
+### Synchronize Panel Time
+
+Synchronize the panel's real-time clock with the Linux system time:
+
+```bash
+coolledux-upload --address 01:00:00:54:EC:17 --sync-time
+```
+
+### Panel Orientation
+
+The panel orientation setting is persistent and can be changed without
+uploading new content:
+
+```bash
+coolledux-upload --address 01:00:00:54:EC:17 --flip none
+coolledux-upload --address 01:00:00:54:EC:17 --flip x
+coolledux-upload --address 01:00:00:54:EC:17 --flip y
+coolledux-upload --address 01:00:00:54:EC:17 --flip xy
+```
+
+The available orientation modes are `none`, `x`, `y`, and `xy`.
+
+---
+
+## Native Live Clock
+
+CoolLEDUX panels support native live clock programs. Unlike a pre-rendered
+GIF, the panel maintains and displays the clock using its own real-time clock.
+
+Upload a native clock:
+
+```bash
+coolledux-upload --clock --auto
+```
+
+Use 24-hour time:
+
+```bash
+coolledux-upload --clock --24-hour --auto
+```
+
+Choose a clock color:
+
+```bash
+coolledux-upload --clock --color green --auto
+```
+
+Colors can also be specified as RGB hex values:
+
+```bash
+coolledux-upload --clock --color '#00ff00' --auto
+```
+
+### Custom Clock Faces
+
+Custom native clock faces can define digit artwork, colon artwork, color,
+and geometry while retaining the panel's native live clock behavior.
+
+Load a clock face by name or folder path:
+
+```bash
+coolledux-upload --clock --clock-face FACE_NAME --auto
+```
+
+Clock faces can also be customized with individual options such as:
+
+```text
+--custom-font
+--custom-colon
+--hour-x
+--colon-x
+--minute-x
+--clock-y
+--colon-w
+```
+
+Use `coolledux-upload --help` for the current list of clock options.
+
+### Clock Preview
+
+A custom clock can be rendered locally to a PNG without connecting to the
+panel:
+
+```bash
+coolledux-upload --render-clock --render-text 12:34 --save preview.png
+```
+
+The uploader also includes `--upload-render-clock` for uploading a rendered
+clock as static panel content. This is separate from the native live clock
+mode.
 
 ---
 
@@ -137,32 +262,6 @@ coolledux-upload myanimation.gif --auto --speed 0.5
 
 ---
 
-## Brightness
-
-Brightness range is 0–15.
-
-```bash
-coolledux-upload myanimation.gif --auto --brightness 15
-```
-
-Medium brightness:
-
-```bash
-coolledux-upload myanimation.gif --auto --brightness 8
-```
-
----
-
-## Specify Device Address
-
-If automatic detection fails:
-
-```bash
-coolledux-upload myanimation.gif \
-    --address 01:00:00:54:EC:17
-```
-
----
 
 ## Help
 
@@ -231,18 +330,33 @@ Working:
 
 * BLE communication
 * Authentication/login
-* Program upload
-* GIF animation upload
+* Native program upload
+* Animated GIF upload
 * Auto panel discovery
+* Automatic GIF resizing
 * Playback speed adjustment
 * Brightness control
+* Panel RTC time synchronization
+* Persistent panel orientation control
+* Native live clock programs
+* 12-hour and 24-hour native clock modes
+* Custom native clock digit fonts
+* Custom native clock colon bitmaps
+* External clock-face loading
+* Custom clock colors and geometry
+* Local clock preview rendering
 * Linux command installation
 
-Planned:
+Experimental / under investigation:
 
-* Additional protocol research
-* JT file investigation
-* Additional panel support
+* Multiple content blocks in a single native program
+* Additional CoolLEDUX BLE commands and protocol behavior
+* Additional panel models and compatibility
+* JT file format / protocol behavior
+
+Possible future work:
+
+* Additional panel controls
 * GUI frontend
 * Packaging for major Linux distributions
 
