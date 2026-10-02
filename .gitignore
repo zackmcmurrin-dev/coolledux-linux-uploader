@@ -16,3 +16,6 @@ __pycache__/
 
 # Local development / known-good backups
 coolledux-upload.py.v*
+
+# Local Bluetooth reverse-engineering captures
+bluetooth-capture/
