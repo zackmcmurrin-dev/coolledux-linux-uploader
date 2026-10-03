@@ -220,29 +220,27 @@ mode.
 
 ## Force Re-Upload
 
-The panel will skip uploads if it already contains the same animation.
+The panel may skip an upload if it already contains the same program.
 
-To force an upload:
+Force an animation upload:
 
 ```bash
 coolledux-upload myanimation.gif --auto --force
 ```
 
-### Known Limitation
-
-`--force` works by modifying the first frame timing so the panel treats the upload as a new animation.
-
-For some seamless looping GIFs (such as Matrix rain effects), this may introduce a visible stutter at the loop point.
-
-If smooth playback is important, upload normally:
+Force a native clock upload:
 
 ```bash
-coolledux-upload myanimation.gif --auto
+coolledux-upload --clock --clock-face pipboy --auto --force
 ```
 
-or make a small edit to the GIF before uploading.
+For GIF animations, `--force` changes the first-frame timing so the panel
+treats the animation as a different program. This can introduce a visible
+stutter at the loop point of some seamless animations.
 
-Static images are generally unaffected.
+For native clocks, `--force` changes an otherwise unused program-header byte.
+Hardware testing shows this changes the program CRC and forces a fresh upload
+without changing the clock's appearance or native live-clock behavior.
 
 ---
 

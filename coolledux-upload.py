@@ -11,7 +11,7 @@ from bleak import BleakClient, BleakScanner
 from PIL import Image, ImageSequence
 
 
-VERSION = "0.2.0-clocktest"
+VERSION = "0.2.0"
 DEFAULT_ADDR = "01:00:00:54:EC:17"
 CHAR = "0000fff1-0000-1000-8000-00805f9b34fb"
 
