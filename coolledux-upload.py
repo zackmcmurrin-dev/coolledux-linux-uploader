@@ -1197,8 +1197,8 @@ def parse_args():
 
     p.add_argument("gif", nargs="?", help="GIF file to upload")
     p.add_argument("--clock", action="store_true", help="Upload native live clock program")
-    p.add_argument("--style", type=int, default=1, help="Clock style number")
-    p.add_argument("--color", default="white", help="Clock color name or #RRGGBB")
+    p.add_argument("--style", type=int, default=None, help="Clock style number")
+    p.add_argument("--color", default=None, help="Clock color name or #RRGGBB")
     p.add_argument("--custom-font", default=None, help="Use custom native live clock font, example: pipboy")
     p.add_argument("--custom-colon", default=None, help="Use custom native clock colon bitmap file")
     p.add_argument("--clock-face", default=None, help="Apply clock face name or folder path")
@@ -1262,8 +1262,10 @@ def apply_clock_face(args):
         args.custom_colon = str(colon_file)
 
     # Apply theme defaults only when user did not override them.
-    args.color = face.get("color", args.color)
-    args.style = face.get("style", args.style)
+    if args.color is None:
+        args.color = face.get("color", "white")
+    if args.style is None:
+        args.style = face.get("style", 1)
 
     if args.hour_x is None:
         args.hour_x = face.get("hour_x")
@@ -1280,6 +1282,12 @@ def apply_clock_face(args):
 def main():
     args = parse_args()
     apply_clock_face(args)
+
+    # Normal defaults when no clock face supplied them.
+    if args.color is None:
+        args.color = "white"
+    if args.style is None:
+        args.style = 1
 
     if args.render_clock:
         rgb = color_name_to_rgb(args.color)
