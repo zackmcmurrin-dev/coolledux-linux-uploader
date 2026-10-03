@@ -806,7 +806,7 @@ def make_chunk_packet(compressed, chunk_index, chunk):
 
 
 def make_brightness_packet(level):
-    return wrap(bytes([0x04, level & 0x0F]))
+    return wrap(bytes([0x04, level & 0xFF]))
 
 
 def make_flip_packet(mode):
@@ -1219,7 +1219,7 @@ def parse_args():
     p.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier. 2.0 is twice as fast, 0.5 is half speed")
     p.add_argument("--quiet", action="store_true", help="Hide notify ACK spam")
     p.add_argument("--force", action="store_true", help="Force re-upload by changing first frame delay")
-    p.add_argument("--brightness", type=int, choices=range(0, 16), metavar="0-15", help="Set brightness before upload")
+    p.add_argument("--brightness", type=int, choices=range(5, 256), metavar="5-255", help="Set panel brightness (5-255)")
     p.add_argument("--flip", choices=("none", "x", "y", "xy"), help="Set persistent panel orientation")
     p.add_argument("--sync-time", action="store_true", help="Synchronize panel clock from system time")
     p.add_argument("--render-clock", action="store_true", help="Render custom 64x16 clock PNG only; no BLE upload")
