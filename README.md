@@ -119,10 +119,10 @@ coolledux-upload myanimation.gif --address 01:00:00:54:EC:17
 
 ### Brightness
 
-Brightness can be set from 0 to 15 without uploading a GIF:
+Brightness can be set from 5 to 255 without uploading a GIF:
 
 ```bash
-coolledux-upload --address 01:00:00:54:EC:17 --brightness 8
+coolledux-upload --address 01:00:00:54:EC:17 --brightness 128
 ```
 
 ### Synchronize Panel Time

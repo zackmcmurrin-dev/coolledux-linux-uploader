@@ -5,7 +5,7 @@ APP_NAME="coolledux-upload"
 INSTALL_DIR="$HOME/.local/bin"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "CoolLEDUX Linux GIF Uploader installer"
+echo "CoolLEDUX Linux Uploader installer"
 echo
 
 if ! command -v python3 >/dev/null 2>&1; then
