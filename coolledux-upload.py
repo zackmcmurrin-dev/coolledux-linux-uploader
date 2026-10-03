@@ -467,9 +467,10 @@ def custom_font_from_5x7(name="pipboy"):
                 y1 = py * 2
                 y2 = y1 + 1
 
-                # Native clock columns use bit 0 as the top row.
-                cols[x] |= 1 << y1
-                cols[x] |= 1 << y2
+                # Custom native clock columns are vertically inverted
+                # relative to the human-readable top-to-bottom source rows.
+                cols[x] |= 1 << (15 - y1)
+                cols[x] |= 1 << (15 - y2)
 
         for col in cols:
             out += col.to_bytes(2, "big")
@@ -524,14 +525,14 @@ def load_colon_file(path):
             f"found {len(rows)}"
         )
 
-    # Native clock bitmap: each column is a 16-bit value,
-    # with bit 0 representing the top row.
+    # Custom native clock columns are vertically inverted
+    # relative to the human-readable top-to-bottom source rows.
     cols = [0, 0]
 
     for y, row in enumerate(rows):
         for x, ch in enumerate(row):
             if ch == "#":
-                cols[x] |= 1 << y
+                cols[x] |= 1 << (15 - y)
 
     out = bytearray()
     for col in cols:
