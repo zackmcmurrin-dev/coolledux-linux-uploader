@@ -1192,8 +1192,23 @@ def load_clock_face(name_or_path):
 
     raise SystemExit(f"ERROR: clock face not found: {name_or_path}")
 
+def brightness_value(value):
+    try:
+        value = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("brightness must be an integer from 5 to 255")
+
+    if not 5 <= value <= 255:
+        raise argparse.ArgumentTypeError("brightness must be between 5 and 255")
+
+    return value
+
+
 def parse_args():
-    p = argparse.ArgumentParser(description="Upload GIF animations or native clock programs to a CoolLEDUX BLE LED panel.")
+    p = argparse.ArgumentParser(
+        prog="coolledux-upload",
+        description="Upload GIF animations or native clock programs to a CoolLEDUX BLE LED panel.",
+    )
 
     p.add_argument("gif", nargs="?", help="GIF file to upload")
     p.add_argument("--clock", action="store_true", help="Upload native live clock program")
@@ -1219,7 +1234,7 @@ def parse_args():
     p.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier. 2.0 is twice as fast, 0.5 is half speed")
     p.add_argument("--quiet", action="store_true", help="Hide notify ACK spam")
     p.add_argument("--force", action="store_true", help="Force re-upload by changing first frame delay")
-    p.add_argument("--brightness", type=int, choices=range(5, 256), metavar="5-255", help="Set panel brightness (5-255)")
+    p.add_argument("--brightness", type=brightness_value, metavar="5-255", help="Set panel brightness (5-255)")
     p.add_argument("--flip", choices=("none", "x", "y", "xy"), help="Set persistent panel orientation")
     p.add_argument("--sync-time", action="store_true", help="Synchronize panel clock from system time")
     p.add_argument("--render-clock", action="store_true", help="Render custom 64x16 clock PNG only; no BLE upload")
@@ -1342,7 +1357,7 @@ def main():
         raise SystemExit("ERROR: missing GIF file. Example: coolledux-upload animation.gif --auto")
 
     if not Path(args.gif).exists():
-        raise FileNotFoundError(args.gif)
+        raise SystemExit(f"ERROR: GIF file not found: {args.gif}")
 
     asyncio.run(upload(args))
 
