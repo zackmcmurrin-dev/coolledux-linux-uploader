@@ -666,7 +666,7 @@ def build_clock_combine_block(style=1, color_rgb=(255, 255, 255), is_24h=True, b
     return u32(len(body) + 4) + bytes(body)
 
 
-def build_native_clock_program(style=1, color_rgb=(255, 255, 255), is_24h=False, geometry=None, custom_font=None, custom_colon=None):
+def build_native_clock_program(style=1, color_rgb=(255, 255, 255), is_24h=False, geometry=None, custom_font=None, custom_colon=None, force=False):
     clock_block = build_clock_combine_block(
         style=style,
         color_rgb=color_rgb,
@@ -677,7 +677,17 @@ def build_native_clock_program(style=1, color_rgb=(255, 255, 255), is_24h=False,
     )
 
     program = bytearray()
-    program += b"\x00" * 8
+
+    # The first outer program-header byte is normally zero. Hardware testing
+    # shows that values 0x01, 0x02, and 0xff are accepted without changing
+    # native clock rendering. Use it as a nonce for --force so the program CRC
+    # changes and the panel does not reject the upload as already present.
+    force_nonce = 0
+    if force:
+        force_nonce = 1 + (int(time.time() * 1000) % 255)
+
+    program += bytes([force_nonce])
+    program += b"\x00" * 7
     program += b"\x01"           # contentNumber: one clock combine program
     program += b"\x00"
     program += clock_block
@@ -1067,6 +1077,7 @@ async def upload_clock(args):
         geometry=geometry,
         custom_font=args.custom_font,
         custom_colon=args.custom_colon,
+        force=args.force,
     )
 
     await upload_program(
@@ -1233,7 +1244,7 @@ def parse_args():
     p.add_argument("--index", type=int, default=0, help="Program index to upload")
     p.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier. 2.0 is twice as fast, 0.5 is half speed")
     p.add_argument("--quiet", action="store_true", help="Hide notify ACK spam")
-    p.add_argument("--force", action="store_true", help="Force re-upload by changing first frame delay")
+    p.add_argument("--force", action="store_true", help="Force re-upload even if the panel already contains the program")
     p.add_argument("--brightness", type=brightness_value, metavar="5-255", help="Set panel brightness (5-255)")
     p.add_argument("--flip", choices=("none", "x", "y", "xy"), help="Set persistent panel orientation")
     p.add_argument("--sync-time", action="store_true", help="Synchronize panel clock from system time")
