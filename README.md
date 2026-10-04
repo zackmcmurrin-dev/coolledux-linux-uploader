@@ -13,6 +13,7 @@ Development is currently focused on reverse engineering the CoolLEDUX BLE protoc
 * Native Linux support
 * BLE auto-discovery
 * Animated GIF upload
+* Multiple GIF upload with automatic cycling
 * Automatic GIF resizing
 * Adjustable GIF playback speed
 * Progress percentage display
@@ -116,6 +117,33 @@ You can also specify the panel BLE address directly:
 ```bash
 coolledux-upload myanimation.gif --address 01:00:00:54:EC:17
 ```
+
+### Multiple GIFs
+
+Multiple animations can be uploaded as one cycling program set:
+
+```bash
+coolledux-upload --multi first.gif second.gif third.gif --auto
+```
+
+A panel address can also be specified directly:
+
+```bash
+coolledux-upload --multi first.gif second.gif third.gif \
+  --address 01:00:00:54:EC:17
+```
+
+The GIF order determines the playback order. All programs are configured
+during one BLE session, matching the behavior of the official CoolLEDUX
+application.
+
+If a program is already stored on the panel, the uploader reuses the cached
+copy instead of retransmitting its animation data. Missing programs are
+uploaded normally and then included in the cycling set.
+
+`--multi` requires at least two GIF files. `--force` is intentionally not
+supported with multi-GIF uploads because forcing animated GIF programs
+changes first-frame timing and may introduce a visible pause at the loop point.
 
 ### Brightness
 
@@ -330,6 +358,8 @@ Working:
 * Authentication/login
 * Native program upload
 * Animated GIF upload
+* Multiple GIF upload and automatic cycling
+* Cached-program reuse in multi-GIF sets
 * Auto panel discovery
 * Automatic GIF resizing
 * Playback speed adjustment

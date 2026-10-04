@@ -11,7 +11,7 @@ from bleak import BleakClient, BleakScanner
 from PIL import Image, ImageSequence
 
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 DEFAULT_ADDR = "01:00:00:54:EC:17"
 CHAR = "0000fff1-0000-1000-8000-00805f9b34fb"
 
@@ -1039,6 +1039,161 @@ async def upload_program(args, program, label, details=None):
         await asyncio.sleep(3)
 
 
+async def upload_multiple(args, gif_paths):
+    notification_handler.quiet = args.quiet
+
+    if args.auto:
+        args.address = await find_coolledux(timeout=args.scan_timeout)
+
+    count = len(gif_paths)
+
+    if count < 2:
+        raise SystemExit("ERROR: --multi requires at least two GIF files.")
+
+    programs = []
+
+    print(f"multi-program set:    {count} GIFs")
+    print(f"address:              {args.address}")
+
+    for index, gif_path in enumerate(gif_paths):
+        program, frame_count, delays = build_native_program_from_gif(
+            gif_path,
+            args.width,
+            args.height,
+            args.max_frames,
+            args.speed,
+            False,
+        )
+
+        compressed = lzss_compress(program)
+        chunk_list = list(chunks(compressed))
+
+        programs.append(
+            (
+                gif_path,
+                program,
+                compressed,
+                chunk_list,
+                frame_count,
+                delays,
+            )
+        )
+
+        print()
+        print(f"slot {index}:")
+        print(f"  gif:                {gif_path}")
+        print(f"  frames:             {frame_count}")
+        print(f"  first delay:        {delays[0]} ms")
+        print(f"  native size:        {len(program)}")
+        print(f"  compressed size:    {len(compressed)}")
+        print(f"  crc:                {crc32_coolledux(program):08x}")
+        print(f"  index/count/show:   {index}/{count}/1")
+        print(f"  chunks:             {len(chunk_list)}")
+
+    async with BleakClient(args.address) as client:
+        print()
+        print("connected")
+
+        await client.start_notify(CHAR, notification_handler)
+        await asyncio.sleep(0.2)
+
+        print("sending login")
+        await write_ble_packet(
+            client,
+            wrap(bytes.fromhex("0d 55 55 55 55 55 55 55 00")),
+        )
+        await wait_for_ack("login")
+        print("login ACK OK")
+
+        if args.brightness is not None:
+            print(f"setting brightness {args.brightness}")
+            await write_ble_packet(
+                client,
+                make_brightness_packet(args.brightness),
+            )
+            await wait_for_ack("brightness")
+            print("brightness ACK OK")
+
+        for index, item in enumerate(programs):
+            (
+                gif_path,
+                program,
+                compressed,
+                chunk_list,
+                frame_count,
+                delays,
+            ) = item
+
+            print()
+            print(f"=== SLOT {index}/{count - 1}: {gif_path} ===")
+            print(f"sending start ({index}/{count}/1)")
+
+            await write_ble_packet(
+                client,
+                make_start_packet(
+                    program,
+                    index=index,
+                    count=count,
+                    show_count=1,
+                ),
+            )
+
+            start_ack = await wait_for_ack("start")
+            print("start ACK:", start_ack.hex(" "))
+
+            if len(start_ack) >= 2 and start_ack[1] == 1:
+                print("panel already contains program; using cached copy")
+                await asyncio.sleep(0.2)
+                continue
+
+            if len(start_ack) >= 2 and start_ack[1] == 3:
+                print("panel requested retransmit from chunk 0")
+
+            elif len(start_ack) >= 2 and start_ack[1] != 0:
+                raise RuntimeError(
+                    f"panel rejected slot {index} start packet "
+                    f"with status {start_ack[1]:02x}"
+                )
+
+            for chunk_index, chunk in enumerate(chunk_list):
+                percent = int(
+                    ((chunk_index + 1) / len(chunk_list)) * 100
+                )
+
+                print(
+                    f"sending slot {index} chunk "
+                    f"{chunk_index + 1}/{len(chunk_list)} "
+                    f"({percent}%)"
+                )
+
+                await write_ble_packet(
+                    client,
+                    make_chunk_packet(
+                        compressed,
+                        chunk_index,
+                        chunk,
+                    ),
+                )
+
+                ack = await wait_for_ack("chunk")
+
+                if len(ack) >= 2 and ack[1] != 0:
+                    raise RuntimeError(
+                        f"slot {index} chunk {chunk_index} "
+                        f"rejected: {ack.hex(' ')}"
+                    )
+
+                await asyncio.sleep(0.03)
+
+            print(f"slot {index} upload complete")
+            await asyncio.sleep(0.2)
+
+        print()
+        print("multi-program set complete")
+        print("done, watch panel")
+        await asyncio.sleep(3)
+
+
 async def upload(args):
     program, frame_count, delays = build_native_program_from_gif(
         args.gif,
@@ -1222,6 +1377,12 @@ def parse_args():
     )
 
     p.add_argument("gif", nargs="?", help="GIF file to upload")
+    p.add_argument(
+        "--multi",
+        nargs="+",
+        metavar="GIF",
+        help="Upload multiple GIFs as one cycling program set",
+    )
     p.add_argument("--clock", action="store_true", help="Upload native live clock program")
     p.add_argument("--style", type=int, default=None, help="Clock style number")
     p.add_argument("--color", default=None, help="Clock color name or #RRGGBB")
@@ -1356,6 +1517,37 @@ def main():
 
     if args.flip is not None and not args.gif and not args.clock:
         asyncio.run(set_flip(args))
+        return
+
+    if args.multi:
+        if args.gif:
+            raise SystemExit(
+                "ERROR: use either a single positional GIF or --multi, not both."
+            )
+
+        if args.clock:
+            raise SystemExit(
+                "ERROR: --multi cannot be combined with --clock."
+            )
+
+        if args.force:
+            raise SystemExit(
+                "ERROR: --force is not supported with --multi because "
+                "forced GIF uploads alter loop timing."
+            )
+
+        if len(args.multi) < 2:
+            raise SystemExit(
+                "ERROR: --multi requires at least two GIF files."
+            )
+
+        for gif_path in args.multi:
+            if not Path(gif_path).exists():
+                raise SystemExit(
+                    f"ERROR: GIF file not found: {gif_path}"
+                )
+
+        asyncio.run(upload_multiple(args, args.multi))
         return
 
     if args.clock:
